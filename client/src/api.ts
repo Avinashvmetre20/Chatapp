@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://chatapp-j9na.onrender.com';
 
 export type User = {
   user_id: number;
