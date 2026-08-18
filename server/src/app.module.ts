@@ -9,6 +9,8 @@ import { DatabaseModule } from './modules/database/database.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { CallsModule } from './modules/calls/calls.module';
+import { PresenceModule } from './modules/presence/presence.module';
 
 @Module({
   imports: [
@@ -18,9 +20,11 @@ import { ChatsModule } from './modules/chats/chats.module';
     }),
 
     DatabaseModule,
+    PresenceModule,
     HealthModule,
     UsersModule,
     ChatsModule,
+    CallsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.DEV
+import type { CallSession } from './features/calls/types/call.types';
+
+export const API_URL = import.meta.env.DEV
   ? 'http://localhost:3000'
   : 'https://chatapp-j9na.onrender.com';
 
@@ -8,7 +10,10 @@ export type User = {
   last_name: string;
   created_at: string;
   updated_at: string;
+  last_seen?: string | null;
 };
+
+export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export type Chat = {
   chat_id: number;
@@ -16,6 +21,8 @@ export type Chat = {
   receiver_id: number;
   message: string;
   created_at: string;
+  status?: MessageStatus;
+  queued?: boolean;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -40,8 +47,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getUsers() {
-  return request<User[]>('/users');
+export function getUsers(userId?: number) {
+  const query = userId ? `?userId=${userId}` : '';
+  return request<User[]>(`/users${query}`);
 }
 
 export function createUser(body: {
@@ -72,13 +80,12 @@ export function getChats(userId: number, otherUserId: number) {
   );
 }
 
-export function sendChat(body: {
-  senderId: number;
-  receiverId: number;
-  message: string;
-}) {
-  return request<Chat>('/chats', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+export function getIceServers() {
+  return request<{ iceServers: { urls: string; username?: string; credential?: string }[] }>(
+    '/calls/ice-servers',
+  ).then((body) => body.iceServers);
+}
+
+export function getCalls(userId: number) {
+  return request<CallSession[]>(`/calls?userId=${userId}`);
 }

@@ -1,31 +1,28 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, QueryResult, QueryResultRow } from 'pg';
 
 @Injectable()
-export class DatabaseService implements OnModuleDestroy {
+export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
 
   constructor(private readonly configService: ConfigService) {
     const connectionString = this.configService.get<string>('database.url');
 
+    if (!connectionString) {
+      throw new InternalServerErrorException(
+        'DATABASE_URL is not configured',
+      );
+    }
+
     this.pool = new Pool({
-      ...(connectionString
-        ? {
-            connectionString,
-            ssl: { rejectUnauthorized: false },
-          }
-        : {
-            host: this.configService.get<string>('database.host'),
-            port: this.configService.get<number>('database.port'),
-            database: this.configService.get<string>('database.name'),
-            user: this.configService.get<string>('database.user'),
-            password: this.configService.get<string>('database.password'),
-            ssl:
-              process.env.NODE_ENV === 'production'
-                ? { rejectUnauthorized: false }
-                : undefined,
-          }),
+      connectionString,
+      ssl: { rejectUnauthorized: false },
       max: this.configService.get<number>('database.pool.max'),
       idleTimeoutMillis: this.configService.get<number>(
         'database.pool.idleTimeout',
@@ -34,6 +31,43 @@ export class DatabaseService implements OnModuleDestroy {
         'database.pool.connectionTimeout',
       ),
     });
+  }
+
+  async onModuleInit() {
+    await this.pool.query(`
+      ALTER TABLE chat_master
+      ADD COLUMN IF NOT EXISTS status varchar(20) NOT NULL DEFAULT 'sent'
+    `);
+    await this.pool.query(`
+      ALTER TABLE user_master
+      ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
+    `);
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS call_sessions (
+        call_id BIGSERIAL PRIMARY KEY,
+        caller_id BIGINT NOT NULL,
+        receiver_id BIGINT NOT NULL,
+        call_type VARCHAR(20) NOT NULL,
+        status VARCHAR(30) NOT NULL,
+        started_at TIMESTAMPTZ,
+        answered_at TIMESTAMPTZ,
+        ended_at TIMESTAMPTZ,
+        duration_seconds INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_call_sessions_caller_id
+      ON call_sessions(caller_id)
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_call_sessions_receiver_id
+      ON call_sessions(receiver_id)
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_call_sessions_created_at
+      ON call_sessions(created_at DESC)
+    `);
   }
 
   async query<T extends QueryResultRow>(

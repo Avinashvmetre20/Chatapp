@@ -6,16 +6,21 @@ export default () => ({
 
   database: {
     url: process.env.DATABASE_URL,
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT) || 5432,
-    name: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-
     pool: {
       max: Number(process.env.DB_POOL_MAX) || 20,
       idleTimeout: Number(process.env.DB_IDLE_TIMEOUT) || 30000,
       connectionTimeout: Number(process.env.DB_CONNECTION_TIMEOUT) || 5000,
     },
+  },
+
+  webrtc: {
+    stunUrl: process.env.WEBRTC_STUN_URL ?? 'stun:stun.l.google.com:19302',
+    turnUrl: process.env.WEBRTC_TURN_URL ?? '',
+    turnUsername: process.env.WEBRTC_TURN_USERNAME ?? '',
+    turnPassword: process.env.WEBRTC_TURN_PASSWORD ?? '',
+  },
+
+  calls: {
+    ringTimeoutSeconds: Number(process.env.CALL_RING_TIMEOUT_SECONDS) || 30,
   },
 });
