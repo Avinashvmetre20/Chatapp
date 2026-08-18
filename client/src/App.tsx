@@ -1,52 +1,52 @@
 import { useState } from 'react';
-import type { User } from './api';
+import { useAuth } from './auth/AuthContext';
 import { ChatScreen } from './screens/ChatScreen';
+import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
 import { SignInScreen } from './screens/SignInScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
 
-const USER_KEY = 'chat-user';
-
-function readStoredUser(): User | null {
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
 function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser);
-  const [authScreen, setAuthScreen] = useState<'signin' | 'signup'>('signin');
+  const { status, user, accessToken, logout } = useAuth();
+  const [authScreen, setAuthScreen] = useState<'signin' | 'signup' | 'forgot'>(
+    'signin',
+  );
 
-  function handleAuthSuccess(user: User) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-    setCurrentUser(user);
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50 text-gray-500">
+        Checking session…
+      </div>
+    );
   }
 
-  function handleSignOut() {
-    localStorage.removeItem(USER_KEY);
-    setCurrentUser(null);
-    setAuthScreen('signin');
+  if (status === 'authenticated' && user && accessToken) {
+    return (
+      <ChatScreen
+        accessToken={accessToken}
+        currentUser={user}
+        onSignOut={() => {
+          void logout();
+        }}
+      />
+    );
   }
 
-  if (currentUser) {
-    return <ChatScreen currentUser={currentUser} onSignOut={handleSignOut} />;
+  if (authScreen === 'forgot') {
+    return (
+      <ForgotPasswordScreen onGoToSignIn={() => setAuthScreen('signin')} />
+    );
   }
 
   if (authScreen === 'signup') {
     return (
-      <SignUpScreen
-        onGoToSignIn={() => setAuthScreen('signin')}
-        onSuccess={handleAuthSuccess}
-      />
+      <SignUpScreen onGoToSignIn={() => setAuthScreen('signin')} />
     );
   }
 
   return (
     <SignInScreen
+      onForgotPassword={() => setAuthScreen('forgot')}
       onGoToSignUp={() => setAuthScreen('signup')}
-      onSuccess={handleAuthSuccess}
     />
   );
 }

@@ -13,6 +13,7 @@ import type {
 type UseCallOptions = {
   socket: Socket | null;
   currentUser: User;
+  onIncomingCall?: (call: CallSession) => void;
 };
 
 type CallEnvelope = {
@@ -29,7 +30,7 @@ type IceEnvelope = {
   candidate: RTCIceCandidateInit;
 };
 
-export function useCall({ socket, currentUser }: UseCallOptions) {
+export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions) {
   const webrtcRef = useRef(new WebRtcService());
   const callRef = useRef<CallSession | null>(null);
   const iceServersRef = useRef<IceServer[]>([]);
@@ -232,6 +233,7 @@ export function useCall({ socket, currentUser }: UseCallOptions) {
         callRef.current = incoming;
         setCall(incoming);
         setPhase('incoming');
+        onIncomingCall?.(incoming);
         return;
       }
       if (incoming.callerId === currentUser.user_id) {
@@ -353,7 +355,7 @@ export function useCall({ socket, currentUser }: UseCallOptions) {
       socket.off('call:timeout', onTimeout);
       socket.off('call:busy', onBusy);
     };
-  }, [currentUser.user_id, preparePeer, resetCall, socket]);
+  }, [currentUser.user_id, onIncomingCall, preparePeer, resetCall, socket]);
 
   useEffect(() => {
     return () => {

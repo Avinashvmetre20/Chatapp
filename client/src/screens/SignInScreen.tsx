@@ -1,22 +1,25 @@
 import { AuthForm } from './AuthForm';
-import { signIn, type User } from '../api';
+import { useAuth } from '../auth/AuthContext';
 
 type SignInScreenProps = {
-  onSuccess: (user: User) => void;
   onGoToSignUp: () => void;
+  onForgotPassword: () => void;
 };
 
-export function SignInScreen({ onSuccess, onGoToSignUp }: SignInScreenProps) {
+export function SignInScreen({ onGoToSignUp, onForgotPassword }: SignInScreenProps) {
+  const { login } = useAuth();
+
   return (
     <AuthForm
       loadingLabel="Signing in..."
+      mode="signin"
+      onForgot={onForgotPassword}
       onSubmit={async (values) => {
-        const user = await signIn(values);
-        onSuccess(user);
+        await login(values.email, values.password);
       }}
       onSwitch={onGoToSignUp}
       submitLabel="Sign in"
-      subtitle="Use the first name, last name, and password you registered with."
+      subtitle="Use the email and password for your account."
       switchAction="Sign up"
       switchLabel="New here?"
       title="Sign in"
