@@ -23,4 +23,24 @@ export default () => ({
   calls: {
     ringTimeoutSeconds: Number(process.env.CALL_RING_TIMEOUT_SECONDS) || 30,
   },
+
+  auth: {
+    jwtSecret: process.env.JWT_SECRET ?? '',
+    accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN ?? '15m',
+    refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN ?? '30d',
+    bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
+    loginMaxAttempts: Number(process.env.AUTH_LOGIN_MAX_ATTEMPTS) || 5,
+    loginLockMinutes: Number(process.env.AUTH_LOGIN_LOCK_MINUTES) || 15,
+    cookie: {
+      secure: process.env.AUTH_COOKIE_SECURE
+        ? process.env.AUTH_COOKIE_SECURE === 'true'
+        : process.env.NODE_ENV === 'production',
+      httpOnly: process.env.AUTH_COOKIE_HTTP_ONLY !== 'false',
+      sameSite: (process.env.AUTH_COOKIE_SAME_SITE ??
+        (process.env.NODE_ENV === 'production' ? 'none' : 'lax')) as
+        | 'lax'
+        | 'strict'
+        | 'none',
+    },
+  },
 });

@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { DatabaseService } from './modules/database/database.service';
 
@@ -8,11 +9,14 @@ async function bootstrap() {
   const databaseService = app.get(DatabaseService);
   const port = Number(process.env.PORT ?? 3000);
   const dbName = await databaseService.ping();
+  const origins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim());
 
+  app.use(cookieParser());
   app.enableCors({
-    origin: (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim()),
+    origin: origins,
+    credentials: true,
   });
 
   app.useGlobalPipes(

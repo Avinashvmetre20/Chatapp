@@ -1,4 +1,6 @@
-import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthUser } from '../../common/types/auth-user';
 import { ChatsService } from './chats.service';
 
 @Controller('chats')
@@ -7,9 +9,9 @@ export class ChatsController {
 
   @Get()
   findConversation(
-    @Query('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: AuthUser,
     @Query('otherUserId', ParseIntPipe) otherUserId: number,
   ) {
-    return this.chatsService.getConversation(userId, otherUserId);
+    return this.chatsService.getConversation(user.userId, otherUserId);
   }
 }

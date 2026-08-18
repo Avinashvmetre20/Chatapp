@@ -9,6 +9,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { WsAuthService } from '../auth/ws-auth.service';
 import { PresenceService } from '../presence/presence.service';
 import { ChatsService } from './chats.service';
 
@@ -22,13 +23,11 @@ export type ChatPayload = {
 };
 
 type SendMessagePayload = {
-  senderId: number;
   receiverId: number;
   message: string;
 };
 
 type OpenConversationPayload = {
-  userId: number;
   otherUserId: number;
 };
 
@@ -48,14 +47,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => ChatsService))
     private readonly chatsService: ChatsService,
     private readonly presenceService: PresenceService,
+    private readonly wsAuthService: WsAuthService,
   ) {}
 
-  handleConnection(client: Socket) {
-    const userId = Number(client.handshake.query.userId);
-    if (!Number.isFinite(userId) || userId < 1) {
+  async handleConnection(client: Socket) {
+    const identity = await this.wsAuthService.authenticate(client);
+    if (!identity) {
       client.disconnect();
       return;
     }
+
+    const userId = identity.userId;
+    client.data.userId = userId;
+    client.data.sessionId = identity.sessionId;
 
     const { becameOnline } = this.presenceService.register(client, userId);
 
@@ -78,12 +82,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: SendMessagePayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = Number(client.data.userId);
-    if (userId !== payload.senderId) {
-      return { error: 'Unauthorized' };
-    }
-
-    const chat = await this.chatsService.sendMessage(payload);
+    const userId = this.requireUserId(client);
+    const chat = await this.chatsService.sendMessage(userId, payload);
     return chat;
   }
 
@@ -92,15 +92,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: OpenConversationPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = Number(client.data.userId);
-    if (userId !== payload.userId) {
-      return { error: 'Unauthorized' };
-    }
-
-    return this.chatsService.getConversation(
-      payload.userId,
-      payload.otherUserId,
-    );
+    const userId = this.requireUserId(client);
+    return this.chatsService.getConversation(userId, payload.otherUserId);
   }
 
   @SubscribeMessage('conversation:seen')
@@ -108,12 +101,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: OpenConversationPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = Number(client.data.userId);
-    if (userId !== payload.userId) {
-      return { error: 'Unauthorized' };
-    }
-
-    await this.chatsService.markSeen(payload.userId, payload.otherUserId);
+    const userId = this.requireUserId(client);
+    await this.chatsService.markSeen(userId, payload.otherUserId);
     return { ok: true };
   }
 
@@ -133,4 +122,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${payload.sender_id}`).emit('message:status', payload);
   }
 
+  private requireUserId(client: Socket) {
+    const userId = Number(client.data.userId);
+    if (!Number.isFinite(userId) || userId < 1) {
+      throw new Error('Unauthorized');
+    }
+    return userId;
+  }
 }

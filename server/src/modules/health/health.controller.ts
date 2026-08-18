@@ -1,14 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../../common/decorators/public.decorator';
 import { HealthService } from './health.service';
 
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
-  private readonly healthService: HealthService;
+  constructor(private readonly healthService: HealthService) {}
 
-  constructor(healthService: HealthService) {
-    this.healthService = healthService;
-  }
-
+  @Public()
   @Get()
   getHealth() {
     return this.healthService.getHealth();
