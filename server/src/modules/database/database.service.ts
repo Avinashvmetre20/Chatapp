@@ -7,12 +7,25 @@ export class DatabaseService implements OnModuleDestroy {
   private readonly pool: Pool;
 
   constructor(private readonly configService: ConfigService) {
+    const connectionString = this.configService.get<string>('database.url');
+
     this.pool = new Pool({
-      host: this.configService.get<string>('database.host'),
-      port: this.configService.get<number>('database.port'),
-      database: this.configService.get<string>('database.name'),
-      user: this.configService.get<string>('database.user'),
-      password: this.configService.get<string>('database.password'),
+      ...(connectionString
+        ? {
+            connectionString,
+            ssl: { rejectUnauthorized: false },
+          }
+        : {
+            host: this.configService.get<string>('database.host'),
+            port: this.configService.get<number>('database.port'),
+            database: this.configService.get<string>('database.name'),
+            user: this.configService.get<string>('database.user'),
+            password: this.configService.get<string>('database.password'),
+            ssl:
+              process.env.NODE_ENV === 'production'
+                ? { rejectUnauthorized: false }
+                : undefined,
+          }),
       max: this.configService.get<number>('database.pool.max'),
       idleTimeoutMillis: this.configService.get<number>(
         'database.pool.idleTimeout',
@@ -30,12 +43,14 @@ export class DatabaseService implements OnModuleDestroy {
     return this.pool.query<T>(text, params);
   }
 
-  async ping(): Promise<boolean> {
+  async ping(): Promise<string | null> {
     try {
-      await this.pool.query('SELECT 1');
-      return true;
+      const result = await this.pool.query<{ current_database: string }>(
+        'SELECT current_database()',
+      );
+      return result.rows[0]?.current_database ?? null;
     } catch {
-      return false;
+      return null;
     }
   }
 

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { getChats, getUsers, sendChat, type Chat, type User } from '../api';
 
 function displayName(user: User) {
@@ -45,13 +45,12 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
   }, []);
 
   useEffect(() => {
-    const fromId = currentUser.user_id;
-    const toId = otherUserId;
-
-    if (!toId) {
+    if (!otherUserId) {
       return;
     }
 
+    const fromId = currentUser.user_id;
+    const toId = otherUserId;
     let cancelled = false;
 
     async function loadChats() {
@@ -110,7 +109,7 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
     <div className="flex min-h-screen bg-white text-gray-900">
       <aside className="flex w-80 shrink-0 flex-col border-r border-gray-200 bg-gray-50">
         <div className="border-b border-gray-200 p-4">
-          <h1 className="text-lg font-semibold text-gray-900">Chat App</h1>
+          <h1 className="text-lg font-semibold">Chat App</h1>
           <p className="mt-1 text-sm text-gray-500">
             Signed in as {displayName(currentUser)}
           </p>
@@ -156,9 +155,9 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-white">
+      <main className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-gray-200 px-6 py-4">
-          <h2 className="font-medium text-gray-900">
+          <h2 className="font-medium">
             {otherUser
               ? `Chat with ${displayName(otherUser)}`
               : 'Select someone to start chatting'}
@@ -166,9 +165,9 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
         </header>
 
         {error ? (
-          <div className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
-          </div>
+          </p>
         ) : null}
 
         <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
@@ -185,9 +184,7 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
               >
                 <div
                   className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
-                    mine
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                    mine ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-900'
                   }`}
                 >
                   <p>{chat.message}</p>
@@ -202,11 +199,11 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
         </div>
 
         <form
-          className="flex gap-2 border-t border-gray-200 bg-white p-4"
+          className="flex gap-2 border-t border-gray-200 p-4"
           onSubmit={onSendMessage}
         >
           <input
-            className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-sky-500"
             disabled={!otherUserId}
             maxLength={1000}
             onChange={(event) => setMessage(event.target.value)}

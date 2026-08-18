@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 type AuthFormProps = {
   title: string;
@@ -14,9 +14,6 @@ type AuthFormProps = {
     password: string;
   }) => Promise<void>;
 };
-
-const inputClass =
-  'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100';
 
 export function AuthForm({
   title,
@@ -55,18 +52,18 @@ export function AuthForm({
         onSubmit={handleSubmit}
       >
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
+          <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
         </div>
 
         {error ? (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
-          </div>
+          </p>
         ) : null}
 
         <input
-          className={inputClass}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-sky-500"
           maxLength={50}
           onChange={(event) => setFirstName(event.target.value)}
           placeholder="First name"
@@ -74,7 +71,7 @@ export function AuthForm({
           value={firstName}
         />
         <input
-          className={inputClass}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-sky-500"
           maxLength={50}
           onChange={(event) => setLastName(event.target.value)}
           placeholder="Last name"
@@ -82,7 +79,7 @@ export function AuthForm({
           value={lastName}
         />
         <input
-          className={inputClass}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-sky-500"
           maxLength={20}
           minLength={6}
           onChange={(event) => setPassword(event.target.value)}

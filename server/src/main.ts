@@ -1,18 +1,18 @@
 import { NestFactory } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DatabaseService } from './modules/database/database.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
   const databaseService = app.get(DatabaseService);
-  const port = configService.get<number>('PORT', 3000);
-  const dbOk = await databaseService.ping();
+  const port = Number(process.env.PORT ?? 3000);
+  const dbName = await databaseService.ping();
 
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim()),
   });
 
   app.useGlobalPipes(
@@ -26,7 +26,9 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`Server running on port ${port}`);
-  console.log(`Database ${dbOk ? 'connected' : 'disconnected'}`);
+  console.log(
+    dbName ? `Database connected: ${dbName}` : 'Database disconnected',
+  );
 }
 bootstrap().catch((err) => {
   console.error(err);

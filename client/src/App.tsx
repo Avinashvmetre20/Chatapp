@@ -30,25 +30,25 @@ function App() {
     setAuthScreen('signin');
   }
 
-  if (!currentUser) {
-    if (authScreen === 'signup') {
-      return (
-        <SignUpScreen
-          onGoToSignIn={() => setAuthScreen('signin')}
-          onSuccess={handleAuthSuccess}
-        />
-      );
-    }
+  if (currentUser) {
+    return <ChatScreen currentUser={currentUser} onSignOut={handleSignOut} />;
+  }
 
+  if (authScreen === 'signup') {
     return (
-      <SignInScreen
-        onGoToSignUp={() => setAuthScreen('signup')}
+      <SignUpScreen
+        onGoToSignIn={() => setAuthScreen('signin')}
         onSuccess={handleAuthSuccess}
       />
     );
   }
 
-  return <ChatScreen currentUser={currentUser} onSignOut={handleSignOut} />;
+  return (
+    <SignInScreen
+      onGoToSignUp={() => setAuthScreen('signup')}
+      onSuccess={handleAuthSuccess}
+    />
+  );
 }
 
 export default App;
