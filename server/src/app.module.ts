@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './modules/database/database.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ChatsModule } from './modules/chats/chats.module';
 import { CallsModule } from './modules/calls/calls.module';
@@ -22,6 +23,7 @@ import { PresenceModule } from './modules/presence/presence.module';
     DatabaseModule,
     PresenceModule,
     HealthModule,
+    AuthModule,
     UsersModule,
     ChatsModule,
     CallsModule,

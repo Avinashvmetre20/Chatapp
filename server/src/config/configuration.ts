@@ -23,4 +23,9 @@ export default () => ({
   calls: {
     ringTimeoutSeconds: Number(process.env.CALL_RING_TIMEOUT_SECONDS) || 30,
   },
+
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+  },
 });

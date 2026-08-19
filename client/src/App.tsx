@@ -1,36 +1,72 @@
-import { useState } from 'react';
-import type { User } from './api';
+import { useEffect, useState } from 'react';
+import {
+  ApiError,
+  clearSession,
+  fetchCurrentUser,
+  getAccessToken,
+  persistSession,
+  readStoredUser,
+  type User,
+} from './api';
 import { ChatScreen } from './screens/ChatScreen';
 import { SignInScreen } from './screens/SignInScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
 
-const USER_KEY = 'chat-user';
-
-function readStoredUser(): User | null {
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
 function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authScreen, setAuthScreen] = useState<'signin' | 'signup'>('signin');
+  const [checkingSession, setCheckingSession] = useState(
+    () => Boolean(getAccessToken()),
+  );
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      clearSession();
+      setCheckingSession(false);
+      return;
+    }
+
+    const storedUser = readStoredUser();
+    if (storedUser) {
+      setCurrentUser(storedUser);
+    }
+
+    void fetchCurrentUser()
+      .then((user) => {
+        persistSession({ user, accessToken: token });
+        setCurrentUser(user);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) {
+          clearSession();
+          setCurrentUser(null);
+        }
+      })
+      .finally(() => {
+        setCheckingSession(false);
+      });
+  }, []);
 
   function handleAuthSuccess(user: User) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
     setCurrentUser(user);
   }
 
   function handleSignOut() {
-    localStorage.removeItem(USER_KEY);
+    clearSession();
     setCurrentUser(null);
     setAuthScreen('signin');
   }
 
-  if (currentUser) {
+  if (checkingSession && !currentUser) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50 text-sm text-gray-500">
+        Restoring session...
+      </div>
+    );
+  }
+
+  if (currentUser && getAccessToken()) {
     return <ChatScreen currentUser={currentUser} onSignOut={handleSignOut} />;
   }
 

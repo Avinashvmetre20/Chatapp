@@ -13,6 +13,8 @@ async function bootstrap() {
     origin: (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
       .split(',')
       .map((origin) => origin.trim()),
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.useGlobalPipes(
