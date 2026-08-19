@@ -1,24 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { DatabaseService } from './modules/database/database.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create(AppModule);
   const databaseService = app.get(DatabaseService);
   const port = Number(process.env.PORT ?? 3000);
   const dbName = await databaseService.ping();
-  const origins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim());
 
-  app.use(cookieParser());
-  app.set('trust proxy', 1);
   app.enableCors({
-    origin: origins,
-    credentials: true,
+    origin: (process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim()),
   });
 
   app.useGlobalPipes(

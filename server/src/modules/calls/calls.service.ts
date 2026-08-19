@@ -79,26 +79,6 @@ export class CallsService implements OnModuleInit {
     return call;
   }
 
-  async resendRingingCalls(userId: number) {
-    const callId = this.activeCallStore.getCallId(userId);
-    if (!callId) {
-      return;
-    }
-
-    try {
-      const call = await this.requireCall(callId);
-      if (call.status !== CallStatus.RINGING) {
-        return;
-      }
-      if (call.callerId !== userId && call.receiverId !== userId) {
-        return;
-      }
-      this.callsGateway.emitToUser(userId, 'call:ringing', { call });
-    } catch {
-      // Ignore stale in-memory call entries.
-    }
-  }
-
   async initiate(
     callerId: number,
     receiverId: number,

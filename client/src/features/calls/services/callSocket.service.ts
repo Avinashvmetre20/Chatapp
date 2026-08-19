@@ -16,19 +16,10 @@ function emitAck<T>(
   socket: Socket,
   event: string,
   payload: object,
-  timeoutMs = 20000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    socket.timeout(timeoutMs).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
+    socket.timeout(12000).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
       if (err) {
-        if (err.message?.toLowerCase().includes('timed out')) {
-          reject(
-            new Error(
-              `Could not reach the server (${event}). Check your connection and try again.`,
-            ),
-          );
-          return;
-        }
         reject(err);
         return;
       }
@@ -41,17 +32,12 @@ function emitAck<T>(
   });
 }
 
-function emitNoAck(socket: Socket, event: string, payload: object): Promise<{ ok: true }> {
-  socket.emit(event, payload);
-  return Promise.resolve({ ok: true });
-}
-
 export const callSocket = {
   initiate(
     socket: Socket,
     payload: { receiverId: number; callType: CallType },
   ) {
-    return emitAck<CallSession>(socket, 'call:initiate', payload, 30000);
+    return emitAck<CallSession>(socket, 'call:initiate', payload);
   },
 
   accept(socket: Socket, callId: string) {
@@ -70,14 +56,14 @@ export const callSocket = {
     socket: Socket,
     payload: { callId: string; receiverId: number; sdp: RTCSessionDescriptionInit },
   ) {
-    return emitNoAck(socket, 'call:offer', payload);
+    return emitAck<{ ok: true }>(socket, 'call:offer', payload);
   },
 
   answer(
     socket: Socket,
     payload: { callId: string; receiverId: number; sdp: RTCSessionDescriptionInit },
   ) {
-    return emitNoAck(socket, 'call:answer', payload);
+    return emitAck<{ ok: true }>(socket, 'call:answer', payload);
   },
 
   iceCandidate(
@@ -88,6 +74,6 @@ export const callSocket = {
       candidate: RTCIceCandidateInit;
     },
   ) {
-    return emitNoAck(socket, 'call:ice-candidate', payload);
+    return emitAck<{ ok: true }>(socket, 'call:ice-candidate', payload);
   },
 };

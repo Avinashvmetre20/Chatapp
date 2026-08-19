@@ -1,83 +1,53 @@
-import {
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-  useSearchParams,
-} from 'react-router-dom';
-import { useAuth } from './auth/AuthContext';
+import { useState } from 'react';
+import type { User } from './api';
 import { ChatScreen } from './screens/ChatScreen';
-import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
 import { SignInScreen } from './screens/SignInScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
-import { loginPath, paths, safeAppPath } from './routes';
 
-function SessionLoading() {
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-gray-50 text-gray-500">
-      Checking session…
-    </div>
-  );
-}
+const USER_KEY = 'chat-user';
 
-function GuestOnly() {
-  const { status } = useAuth();
-  const [params] = useSearchParams();
-
-  if (status === 'loading') {
-    return <SessionLoading />;
+function readStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
   }
-
-  if (status === 'authenticated') {
-    return <Navigate replace to={safeAppPath(params.get('next'))} />;
-  }
-
-  return <Outlet />;
-}
-
-function RequireAuth() {
-  const { status, user, accessToken, logout } = useAuth();
-  const location = useLocation();
-
-  if (status === 'loading') {
-    return <SessionLoading />;
-  }
-
-  if (status !== 'authenticated' || !user || !accessToken) {
-    return <Navigate replace to={loginPath(location.pathname)} />;
-  }
-
-  return (
-    <ChatScreen
-      accessToken={accessToken}
-      currentUser={user}
-      onSignOut={() => {
-        void logout();
-      }}
-    />
-  );
 }
 
 function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(readStoredUser);
+  const [authScreen, setAuthScreen] = useState<'signin' | 'signup'>('signin');
+
+  function handleAuthSuccess(user: User) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    setCurrentUser(user);
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem(USER_KEY);
+    setCurrentUser(null);
+    setAuthScreen('signin');
+  }
+
+  if (currentUser) {
+    return <ChatScreen currentUser={currentUser} onSignOut={handleSignOut} />;
+  }
+
+  if (authScreen === 'signup') {
+    return (
+      <SignUpScreen
+        onGoToSignIn={() => setAuthScreen('signin')}
+        onSuccess={handleAuthSuccess}
+      />
+    );
+  }
+
   return (
-    <Routes>
-      <Route element={<GuestOnly />}>
-        <Route path={paths.login} element={<SignInScreen />} />
-        <Route path={paths.signup} element={<SignUpScreen />} />
-        <Route path={paths.forgotPassword} element={<ForgotPasswordScreen />} />
-      </Route>
-
-      <Route element={<RequireAuth />}>
-        <Route path={paths.user} element={null} />
-        <Route path="/chat/:userId" element={null} />
-        <Route path="/videocall/:userId" element={null} />
-        <Route path="/call/:userId" element={null} />
-      </Route>
-
-      <Route path="/" element={<Navigate to={paths.user} replace />} />
-      <Route path="*" element={<Navigate to={paths.user} replace />} />
-    </Routes>
+    <SignInScreen
+      onGoToSignUp={() => setAuthScreen('signup')}
+      onSuccess={handleAuthSuccess}
+    />
   );
 }
 

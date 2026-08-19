@@ -5,6 +5,11 @@ export class CreateChatDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  senderId: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   receiverId: number;
 
   @IsString()

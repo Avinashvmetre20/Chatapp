@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { matchPath, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import {
-  SOCKET_URL,
+  API_URL,
   getUsers,
   type Chat,
   type MessageStatus,
@@ -11,12 +10,6 @@ import {
 import { IncomingCallModal } from '../features/calls/components/IncomingCallModal';
 import { VideoCall } from '../features/calls/components/VideoCall';
 import { useCall } from '../features/calls/hooks/useCall';
-import { useNotifications } from '../hooks/useNotifications';
-import { paths } from '../routes';
-import {
-  shouldNotifyForCall,
-  shouldNotifyForMessage,
-} from '../services/notification.service';
 
 function displayName(user: User) {
   return `${user.first_name} ${user.last_name}`.trim();
@@ -120,29 +113,8 @@ function MessageTicks({ chat }: { chat: Chat }) {
   return <SingleTickIcon className={iconClass} />;
 }
 
-function parseAppRoute(pathname: string) {
-  const video = matchPath({ path: '/videocall/:userId', end: true }, pathname);
-  const audio = matchPath({ path: '/call/:userId', end: true }, pathname);
-  const chat = matchPath({ path: '/chat/:userId', end: true }, pathname);
-  const raw = video?.params.userId ?? audio?.params.userId ?? chat?.params.userId;
-  const parsed = raw ? Number(raw) : NaN;
-  const otherUserId = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-
-  if (video) {
-    return { kind: 'videocall' as const, otherUserId };
-  }
-  if (audio) {
-    return { kind: 'call' as const, otherUserId };
-  }
-  if (chat) {
-    return { kind: 'chat' as const, otherUserId };
-  }
-  return { kind: 'user' as const, otherUserId: null };
-}
-
 type ChatScreenProps = {
   currentUser: User;
-  accessToken: string;
   onSignOut: () => void;
 };
 
@@ -157,161 +129,34 @@ function isSocketError<T>(value: SocketAck<T>): value is { error: string } {
   );
 }
 
-export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const route = useMemo(
-    () => parseAppRoute(location.pathname),
-    [location.pathname],
-  );
-  const otherUserId = route.otherUserId;
-
+export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [onlineIds, setOnlineIds] = useState<number[]>([]);
+  const [otherUserId, setOtherUserId] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [unreadByUserId, setUnreadByUserId] = useState<Record<number, number>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const otherUserIdRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const accessTokenRef = useRef(accessToken);
-  accessTokenRef.current = accessToken;
-  const usersRef = useRef<User[]>([]);
-  const openChatRef = useRef<(userId: number) => void>(() => {});
-  const callRouteSyncRef = useRef<'off' | 'joining' | 'on'>('off');
-
-  const notifications = useNotifications();
-  const notificationsRef = useRef(notifications);
-  notificationsRef.current = notifications;
 
   const otherUser = users.find((user) => user.user_id === otherUserId);
   const chatUsers = users.filter((user) => user.user_id !== currentUser.user_id);
   const recipientOnline = Boolean(
     otherUser && onlineIds.includes(otherUser.user_id),
   );
-  const call = useCall({
-    socket,
-    currentUser,
-    onIncomingCall: useCallback(
-      (incoming) => {
-        if (
-          !shouldNotifyForCall() ||
-          notificationsRef.current.permission !== 'granted'
-        ) {
-          return;
-        }
-        const caller = usersRef.current.find(
-          (user) => user.user_id === incoming.callerId,
-        );
-        notificationsRef.current.notify({
-          title: `Incoming ${incoming.callType} call`,
-          body: caller ? `${displayName(caller)} is calling you` : 'Incoming call',
-          tag: `call-${incoming.callId}`,
-        });
-      },
-      [],
-    ),
-  });
+  const call = useCall({ socket, currentUser });
   const callPeer = users.find((user) => user.user_id === call.otherUserId);
   const incomingCaller = users.find(
     (user) => user.user_id === call.call?.callerId,
   );
-  const endCallRef = useRef(call.endCall);
-  endCallRef.current = call.endCall;
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) {
-      return;
-    }
-    console.debug('[call-modal]', {
-      phase: call.phase,
-      callId: call.call?.callId ?? null,
-      status: call.call?.status ?? null,
-      callerId: call.call?.callerId ?? null,
-      receiverId: call.call?.receiverId ?? null,
-      visible: call.phase === 'incoming' && Boolean(call.call),
-    });
-  }, [call.call, call.phase]);
-
-  useEffect(() => {
-    if (
-      (route.kind === 'chat' ||
-        route.kind === 'videocall' ||
-        route.kind === 'call') &&
-      !route.otherUserId
-    ) {
-      navigate(paths.user, { replace: true });
-      return;
-    }
-
-    if (route.otherUserId === currentUser.user_id) {
-      navigate(paths.user, { replace: true });
-    }
-  }, [currentUser.user_id, navigate, route.kind, route.otherUserId]);
-
-  useEffect(() => {
-    if (
-      call.phase === 'idle' ||
-      call.phase === 'incoming' ||
-      !call.otherUserId
-    ) {
-      callRouteSyncRef.current = 'off';
-      return;
-    }
-
-    const nextPath =
-      call.call?.callType === 'audio'
-        ? paths.audiocall(call.otherUserId)
-        : paths.videocall(call.otherUserId);
-
-    if (location.pathname === nextPath) {
-      callRouteSyncRef.current = 'on';
-      return;
-    }
-
-    if (callRouteSyncRef.current === 'on') {
-      callRouteSyncRef.current = 'off';
-      void endCallRef.current();
-      return;
-    }
-
-    if (callRouteSyncRef.current === 'joining') {
-      return;
-    }
-
-    callRouteSyncRef.current = 'joining';
-    navigate(nextPath, { replace: true });
-  }, [
-    call.call?.callType,
-    call.otherUserId,
-    call.phase,
-    location.pathname,
-    navigate,
-  ]);
-
-  useEffect(() => {
-    if (call.phase !== 'idle') {
-      return;
-    }
-    if (route.kind !== 'videocall' && route.kind !== 'call') {
-      return;
-    }
-    navigate(
-      route.otherUserId ? paths.chat(route.otherUserId) : paths.user,
-      { replace: true },
-    );
-  }, [call.phase, navigate, route.kind, route.otherUserId]);
-
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
 
   const markConversationSeen = useCallback(
     (socket: Socket, otherId: number) => {
       socket.emit('conversation:seen', {
+        userId: currentUser.user_id,
         otherUserId: otherId,
       });
     },
@@ -322,7 +167,7 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
     (socket: Socket, otherId: number) => {
       socket.emit(
         'conversation:open',
-        { otherUserId: otherId },
+        { userId: currentUser.user_id, otherUserId: otherId },
         (rows: SocketAck<Chat[]>) => {
           if (isSocketError(rows)) {
             setError(rows.error);
@@ -355,6 +200,7 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
       socket.emit(
         'message:send',
         {
+          senderId: chat.sender_id,
           receiverId: chat.receiver_id,
           message: chat.message,
         },
@@ -405,7 +251,7 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   useEffect(() => {
     let cancelled = false;
 
-    void getUsers()
+    void getUsers(currentUser.user_id)
       .then((list) => {
         if (cancelled) {
           return;
@@ -452,14 +298,9 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   }, []);
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-
-    const socket = io(SOCKET_URL || undefined, {
-      auth: { token: accessTokenRef.current },
+    const socket = io(API_URL, {
+      query: { userId: String(currentUser.user_id) },
       transports: ['websocket', 'polling'],
-      withCredentials: true,
     });
 
     socketRef.current = socket;
@@ -471,14 +312,6 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
         loadConversation(socket, openUserId);
       }
       flushQueuedMessages(socket);
-    });
-
-    socket.on('connect_error', (err) => {
-      if (err.message !== 'Unauthorized') {
-        return;
-      }
-      socket.disconnect();
-      onSignOut();
     });
 
     socket.on('presence:list', (userIds: number[]) => {
@@ -496,38 +329,6 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
 
     socket.on('message', (chat: Chat) => {
       const openUserId = otherUserIdRef.current;
-      const isIncoming =
-        chat.receiver_id === currentUser.user_id &&
-        chat.sender_id !== currentUser.user_id;
-
-      if (isIncoming) {
-        if (openUserId !== chat.sender_id) {
-          setUnreadByUserId((prev) => ({
-            ...prev,
-            [chat.sender_id]: (prev[chat.sender_id] ?? 0) + 1,
-          }));
-        }
-
-        if (
-          shouldNotifyForMessage({
-            senderId: chat.sender_id,
-            openChatUserId: openUserId,
-            isIncoming: true,
-          }) &&
-          notificationsRef.current.permission === 'granted'
-        ) {
-          const sender = usersRef.current.find(
-            (user) => user.user_id === chat.sender_id,
-          );
-          notificationsRef.current.notify({
-            title: sender ? displayName(sender) : 'New message',
-            body: chat.message,
-            tag: `chat-${chat.sender_id}`,
-            onClick: () => openChatRef.current(chat.sender_id),
-          });
-        }
-      }
-
       const inThisChat =
         openUserId !== null &&
         ((chat.sender_id === openUserId && chat.receiver_id === currentUser.user_id) ||
@@ -585,16 +386,7 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
     flushQueuedMessages,
     loadConversation,
     markConversationSeen,
-    onSignOut,
   ]);
-
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket || !accessToken) {
-      return;
-    }
-    socket.auth = { token: accessToken };
-  }, [accessToken]);
 
   useEffect(() => {
     otherUserIdRef.current = otherUserId;
@@ -602,67 +394,36 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
 
   useEffect(() => {
     if (!otherUserId) {
-      setChats([]);
       return;
     }
 
     const socket = socketRef.current;
-    setChats([]);
-    setError('');
-
-    if (!socket?.connected) {
+    if (!socket) {
       return;
     }
 
-    loadConversation(socket, otherUserId);
+    if (socket.connected) {
+      loadConversation(socket, otherUserId);
+    } else {
+      socket.once('connect', () => {
+        loadConversation(socket, otherUserId);
+      });
+    }
   }, [currentUser.user_id, loadConversation, otherUserId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chats.length]);
 
-  useEffect(() => {
-    const total = Object.values(unreadByUserId).reduce(
-      (sum, count) => sum + count,
-      0,
-    );
-    const unread = total > 0 ? `(${total}) ` : '';
-    const peer = otherUser ? displayName(otherUser) : '';
-
-    if (route.kind === 'videocall') {
-      document.title = `${unread}Video call${peer ? ` · ${peer}` : ''} | Chat App`;
-      return;
-    }
-    if (route.kind === 'call') {
-      document.title = `${unread}Call${peer ? ` · ${peer}` : ''} | Chat App`;
-      return;
-    }
-    if (route.kind === 'chat') {
-      document.title = `${unread}${peer || 'Chat'} | Chat App`;
-      return;
-    }
-    document.title = `${unread}Chats | Chat App`;
-  }, [otherUser, route.kind, unreadByUserId]);
-
   function openChat(userId: number) {
-    if (route.kind !== 'chat' || otherUserId !== userId) {
-      navigate(paths.chat(userId));
-    }
+    setOtherUserId(userId);
+    setChats([]);
     setError('');
-    setUnreadByUserId((prev) => {
-      if (!prev[userId]) {
-        return prev;
-      }
-      const next = { ...prev };
-      delete next[userId];
-      return next;
-    });
   }
 
-  openChatRef.current = openChat;
-
   function closeChat() {
-    navigate(paths.user);
+    setOtherUserId(null);
+    setChats([]);
   }
 
   function onSendMessage(event: FormEvent) {
@@ -711,21 +472,14 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
             {networkDown ? (
               <p className="text-xs text-amber-600">Offline — messages will send when connected</p>
             ) : null}
-            {notifications.supported && notifications.permission === 'default' ? (
-              <button
-                className="mt-1 text-xs font-medium text-sky-600 hover:text-sky-500"
-                onClick={() => void notifications.requestPermission()}
-                type="button"
-              >
-                Enable notifications
-              </button>
-            ) : null}
-            {notifications.supported && notifications.permission === 'denied' ? (
-              <p className="mt-1 text-xs text-gray-400">
-                Notifications blocked in browser settings
-              </p>
-            ) : null}
           </div>
+          <button
+            className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-sky-600 hover:bg-sky-50"
+            onClick={onSignOut}
+            type="button"
+          >
+            Sign out
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -741,7 +495,6 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
               {chatUsers.map((user) => {
                 const selected = otherUserId === user.user_id;
                 const online = onlineIds.includes(user.user_id);
-                const unread = unreadByUserId[user.user_id] ?? 0;
                 return (
                   <li key={user.user_id}>
                     <button
@@ -768,17 +521,10 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
                             selected ? 'border-sky-600' : 'border-white'
                           } ${online ? 'bg-green-500' : 'bg-gray-400'}`}
                         />
-                        {unread > 0 ? (
-                          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-                            {unread > 9 ? '9+' : unread}
-                          </span>
-                        ) : null}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="block truncate font-medium">
-                            {displayName(user)}
-                          </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {displayName(user)}
                         </span>
                         <span
                           className={`block text-xs ${
@@ -795,16 +541,6 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
             </ul>
           )}
         </div>
-
-        <div className="mt-auto border-t border-gray-200 bg-gray-50 p-3">
-          <button
-            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-sky-600 hover:bg-sky-50"
-            onClick={onSignOut}
-            type="button"
-          >
-            Sign out
-          </button>
-        </div>
       </aside>
 
       <main
@@ -812,20 +548,11 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
       >
         <header className="flex items-center gap-3 border-b border-gray-200 px-3 py-3 sm:px-6">
           <button
-            aria-label="Back"
             className="rounded-lg px-2 py-2 text-sky-600 hover:bg-sky-50 md:hidden"
             onClick={closeChat}
             type="button"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24">
-              <path
-                d="M15 18 9 12l6-6"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-              />
-            </svg>
+            Back
           </button>
           {otherUser ? (
             <div className="flex min-w-0 flex-1 items-center gap-3">

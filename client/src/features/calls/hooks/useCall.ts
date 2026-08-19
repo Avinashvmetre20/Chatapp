@@ -13,7 +13,6 @@ import type {
 type UseCallOptions = {
   socket: Socket | null;
   currentUser: User;
-  onIncomingCall?: (call: CallSession) => void;
 };
 
 type CallEnvelope = {
@@ -30,7 +29,7 @@ type IceEnvelope = {
   candidate: RTCIceCandidateInit;
 };
 
-export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions) {
+export function useCall({ socket, currentUser }: UseCallOptions) {
   const webrtcRef = useRef(new WebRtcService());
   const callRef = useRef<CallSession | null>(null);
   const iceServersRef = useRef<IceServer[]>([]);
@@ -44,22 +43,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [error, setError] = useState('');
-  const incomingHandledCallIdRef = useRef<string | null>(null);
-
-  const debugLog = useCallback((event: string, payload?: object) => {
-    if (!import.meta.env.DEV) {
-      return;
-    }
-    console.debug('[call]', event, payload ?? {});
-  }, []);
-
-  const isTimeoutLikeError = useCallback((err: unknown) => {
-    if (!(err instanceof Error)) {
-      return false;
-    }
-    const message = err.message.toLowerCase();
-    return message.includes('timed out') || message.includes('could not reach the server');
-  }, []);
 
   const resetMedia = useCallback(() => {
     webrtcRef.current.stop();
@@ -75,7 +58,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     callRef.current = null;
     setCall(null);
     setPhase('idle');
-    incomingHandledCallIdRef.current = null;
     resetMedia();
   }, [resetMedia]);
 
@@ -119,12 +101,10 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
   const startCall = useCallback(
     async (receiverId: number, callType: CallType) => {
       if (!socket?.connected) {
-        debugLog('startCall:blocked-offline', { receiverId, callType });
         setError('You are offline. Reconnect before calling.');
         return;
       }
       if (phase !== 'idle') {
-        debugLog('startCall:blocked-phase', { phase, receiverId, callType });
         return;
       }
 
@@ -133,60 +113,16 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       setCameraOn(callType === 'video');
 
       try {
+        iceServersRef.current = await getIceServers();
+        const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
+        setLocalStream(stream);
         const nextCall = await callSocket.initiate(socket, {
-          receiverId,
-          callType,
-        });
-        debugLog('startCall:initiated', {
-          callId: nextCall.callId,
           receiverId,
           callType,
         });
         callRef.current = nextCall;
         setCall(nextCall);
-
-        iceServersRef.current = await getIceServers();
-        const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
-        setLocalStream(stream);
       } catch (err) {
-        debugLog('startCall:error', {
-          receiverId,
-          callType,
-          message: err instanceof Error ? err.message : 'unknown',
-        });
-
-        if (callRef.current && isTimeoutLikeError(err)) {
-          try {
-            iceServersRef.current = await getIceServers();
-            const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
-            setLocalStream(stream);
-            return;
-          } catch (mediaErr) {
-            try {
-              await callSocket.end(socket, callRef.current.callId);
-            } catch {
-              // Hang up locally even if signaling ack fails.
-            }
-            resetCall();
-            const media = mapMediaError(mediaErr);
-            setError(
-              mediaErr instanceof DOMException || media.code !== 'unknown'
-                ? media.message
-                : mediaErr instanceof Error
-                  ? mediaErr.message
-                  : 'Could not start the call',
-            );
-            return;
-          }
-        }
-
-        if (callRef.current) {
-          try {
-            await callSocket.end(socket, callRef.current.callId);
-          } catch {
-            // Hang up locally even if signaling ack fails.
-          }
-        }
         resetCall();
         const media = mapMediaError(err);
         setError(
@@ -198,7 +134,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         );
       }
     },
-    [debugLog, isTimeoutLikeError, phase, resetCall, socket],
+    [phase, resetCall, socket],
   );
 
   const acceptCall = useCallback(async () => {
@@ -207,10 +143,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     }
 
     const activeCall = callRef.current;
-    debugLog('acceptCall:start', {
-      callId: activeCall.callId,
-      callType: activeCall.callType,
-    });
     setError('');
     setPhase('connecting');
     setCameraOn(activeCall.callType === 'video');
@@ -235,10 +167,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         });
       }
     } catch (err) {
-      debugLog('acceptCall:error', {
-        callId: activeCall.callId,
-        message: err instanceof Error ? err.message : 'unknown',
-      });
       resetCall();
       const media = mapMediaError(err);
       setError(
@@ -249,7 +177,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
             : 'Could not accept the call',
       );
     }
-  }, [debugLog, preparePeer, resetCall, socket]);
+  }, [preparePeer, resetCall, socket]);
 
   const rejectCall = useCallback(async () => {
     if (!socket || !callRef.current) {
@@ -257,12 +185,11 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       return;
     }
     try {
-      debugLog('rejectCall:start', { callId: callRef.current.callId });
       await callSocket.reject(socket, callRef.current.callId);
     } finally {
       resetCall();
     }
-  }, [debugLog, resetCall, socket]);
+  }, [resetCall, socket]);
 
   const endCall = useCallback(async () => {
     if (endingRef.current) {
@@ -272,7 +199,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     const activeCall = callRef.current;
     try {
       if (socket && activeCall) {
-        debugLog('endCall:start', { callId: activeCall.callId });
         await callSocket.end(socket, activeCall.callId);
       }
     } catch {
@@ -280,7 +206,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     } finally {
       resetCall();
     }
-  }, [debugLog, resetCall, socket]);
+  }, [resetCall, socket]);
 
   const toggleMic = useCallback(() => {
     setMicOn((prev) => {
@@ -302,40 +228,19 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     }
 
     const onRinging = ({ call: incoming }: CallEnvelope) => {
-      debugLog('event:ringing', {
-        callId: incoming.callId,
-        callerId: incoming.callerId,
-        receiverId: incoming.receiverId,
-        status: incoming.status,
-      });
       if (incoming.receiverId === currentUser.user_id) {
-        if (incomingHandledCallIdRef.current === incoming.callId) {
-          debugLog('event:ringing:deduped', { callId: incoming.callId });
-          return;
-        }
-        incomingHandledCallIdRef.current = incoming.callId;
         callRef.current = incoming;
         setCall(incoming);
         setPhase('incoming');
-        setError('');
-        onIncomingCall?.(incoming);
         return;
       }
       if (incoming.callerId === currentUser.user_id) {
-        if (callRef.current?.callId === incoming.callId) {
-          return;
-        }
         callRef.current = incoming;
         setCall(incoming);
       }
     };
 
     const onAccept = ({ call: accepted }: CallEnvelope) => {
-      debugLog('event:accept', {
-        callId: accepted.callId,
-        callerId: accepted.callerId,
-        receiverId: accepted.receiverId,
-      });
       if (accepted.callId !== callRef.current?.callId) {
         return;
       }
@@ -357,18 +262,12 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
             sdp: offer,
           });
         } catch (err) {
-          debugLog('offer:error', {
-            message: err instanceof Error ? err.message : 'unknown',
-          });
-          if (!isTimeoutLikeError(err)) {
-            setError(err instanceof Error ? err.message : 'Could not send call offer');
-          }
+          setError(err instanceof Error ? err.message : 'Could not send call offer');
         }
       })();
     };
 
     const onOffer = ({ callId, sdp }: OfferEnvelope) => {
-      debugLog('event:offer', { callId, sdpType: sdp.type });
       if (callId !== callRef.current?.callId) {
         return;
       }
@@ -389,18 +288,12 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
             sdp: answer,
           });
         } catch (err) {
-          debugLog('answer:error', {
-            message: err instanceof Error ? err.message : 'unknown',
-          });
-          if (!isTimeoutLikeError(err)) {
-            setError(err instanceof Error ? err.message : 'Could not answer the call');
-          }
+          setError(err instanceof Error ? err.message : 'Could not answer the call');
         }
       })();
     };
 
     const onAnswer = ({ callId, sdp }: OfferEnvelope) => {
-      debugLog('event:answer', { callId, sdpType: sdp.type });
       if (callId !== callRef.current?.callId) {
         return;
       }
@@ -410,10 +303,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     };
 
     const onIce = ({ callId, candidate }: IceEnvelope) => {
-      debugLog('event:ice-candidate', {
-        callId,
-        candidateLength: candidate.candidate?.length ?? 0,
-      });
       if (callId !== callRef.current?.callId) {
         return;
       }
@@ -421,10 +310,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     };
 
     const onClosed = ({ call: closed }: CallEnvelope) => {
-      debugLog('event:closed', {
-        callId: closed.callId,
-        status: closed.status,
-      });
       if (closed.callId !== callRef.current?.callId) {
         return;
       }
@@ -432,24 +317,14 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     };
 
     const onTimeout = ({ call: timedOut }: CallEnvelope) => {
-      debugLog('event:timeout', {
-        callId: timedOut.callId,
-        status: timedOut.status,
-      });
       if (timedOut.callId !== callRef.current?.callId) {
         return;
       }
       resetCall();
-      if (timedOut.callerId === currentUser.user_id) {
-        setError('The call was not answered.');
-      }
+      setError('The call was not answered.');
     };
 
     const onBusy = ({ call: busy }: CallEnvelope) => {
-      debugLog('event:busy', {
-        callId: busy.callId,
-        status: busy.status,
-      });
       if (busy.callerId !== currentUser.user_id) {
         return;
       }
@@ -478,29 +353,11 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       socket.off('call:timeout', onTimeout);
       socket.off('call:busy', onBusy);
     };
-  }, [
-    currentUser.user_id,
-    debugLog,
-    isTimeoutLikeError,
-    onIncomingCall,
-    preparePeer,
-    resetCall,
-    socket,
-  ]);
+  }, [currentUser.user_id, preparePeer, resetCall, socket]);
 
   useEffect(() => {
-    debugLog('state:phase', {
-      phase,
-      callId: call?.callId ?? null,
-      status: call?.status ?? null,
-      otherUserId,
-    });
-  }, [call?.callId, call?.status, debugLog, otherUserId, phase]);
-
-  useEffect(() => {
-    const webrtc = webrtcRef.current;
     return () => {
-      webrtc.stop();
+      webrtcRef.current.stop();
     };
   }, []);
 

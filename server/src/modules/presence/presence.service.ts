@@ -7,8 +7,6 @@ type OfflineListener = (userId: number) => void;
 export class PresenceService {
   private readonly socketsByUser = new Map<number, Set<string>>();
   private readonly offlineListeners: OfflineListener[] = [];
-  private readonly pendingOfflineTimers = new Map<number, NodeJS.Timeout>();
-  private readonly offlineGraceMs = 3500;
 
   onUserOffline(listener: OfflineListener) {
     this.offlineListeners.push(listener);
@@ -18,20 +16,13 @@ export class PresenceService {
     client.data.userId = userId;
     void client.join(`user:${userId}`);
 
-    const pending = this.pendingOfflineTimers.get(userId);
-    if (pending) {
-      clearTimeout(pending);
-      this.pendingOfflineTimers.delete(userId);
-    }
-
     let sockets = this.socketsByUser.get(userId);
     if (!sockets) {
       sockets = new Set();
       this.socketsByUser.set(userId, sockets);
     }
 
-    const becameOnline =
-      sockets.size === 0 && !this.pendingOfflineTimers.has(userId);
+    const becameOnline = sockets.size === 0;
     sockets.add(client.id);
     return { becameOnline };
   }
@@ -51,30 +42,16 @@ export class PresenceService {
     const wentOffline = sockets.size === 0;
     if (wentOffline) {
       this.socketsByUser.delete(userId);
-      const existing = this.pendingOfflineTimers.get(userId);
-      if (existing) {
-        clearTimeout(existing);
+      for (const listener of this.offlineListeners) {
+        listener(userId);
       }
-      const timer = setTimeout(() => {
-        this.pendingOfflineTimers.delete(userId);
-        if ((this.socketsByUser.get(userId)?.size ?? 0) > 0) {
-          return;
-        }
-        for (const listener of this.offlineListeners) {
-          listener(userId);
-        }
-      }, this.offlineGraceMs);
-      this.pendingOfflineTimers.set(userId, timer);
     }
 
     return { userId, wentOffline };
   }
 
   isOnline(userId: number) {
-    return (
-      (this.socketsByUser.get(userId)?.size ?? 0) > 0 ||
-      this.pendingOfflineTimers.has(userId)
-    );
+    return (this.socketsByUser.get(userId)?.size ?? 0) > 0;
   }
 
   getOnlineUserIds() {

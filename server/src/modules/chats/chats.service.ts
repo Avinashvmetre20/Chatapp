@@ -24,13 +24,10 @@ export class ChatsService {
     private readonly chatGateway: ChatGateway,
   ) {}
 
-  async sendMessage(
-    senderId: number,
-    dto: CreateChatDto,
-  ): Promise<ChatMasterRow> {
-    await this.assertUserExists(senderId);
+  async sendMessage(dto: CreateChatDto): Promise<ChatMasterRow> {
+    await this.assertUserExists(dto.senderId);
 
-    if (senderId !== dto.receiverId) {
+    if (dto.senderId !== dto.receiverId) {
       await this.assertUserExists(dto.receiverId);
     }
 
@@ -38,13 +35,13 @@ export class ChatsService {
       `INSERT INTO chat_master (sender_id, receiver_id, message, status)
        VALUES ($1, $2, $3, 'sent')
        RETURNING chat_id, sender_id, receiver_id, message, created_at, status`,
-      [senderId, dto.receiverId, dto.message],
+      [dto.senderId, dto.receiverId, dto.message],
     );
 
     let chat = result.rows[0];
 
     if (
-      senderId !== dto.receiverId &&
+      dto.senderId !== dto.receiverId &&
       this.chatGateway.isOnline(dto.receiverId)
     ) {
       chat = await this.markDelivered(chat.chat_id);

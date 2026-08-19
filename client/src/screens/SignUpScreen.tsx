@@ -1,31 +1,23 @@
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import { usePageTitle } from '../hooks/usePageTitle';
-import { paths, safeAppPath } from '../routes';
 import { AuthForm } from './AuthForm';
+import { createUser, type User } from '../api';
 
-export function SignUpScreen() {
-  const { register } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [params] = useSearchParams();
-  const next = safeAppPath(params.get('next'));
+type SignUpScreenProps = {
+  onSuccess: (user: User) => void;
+  onGoToSignIn: () => void;
+};
 
-  usePageTitle('Sign up | Chat App');
-
+export function SignUpScreen({ onSuccess, onGoToSignIn }: SignUpScreenProps) {
   return (
     <AuthForm
+      includeEmail
       loadingLabel="Creating account..."
-      mode="signup"
       onSubmit={async (values) => {
-        await register(values);
-        navigate(next, { replace: true });
+        const user = await createUser(values);
+        onSuccess(user);
       }}
-      onSwitch={() =>
-        navigate({ pathname: paths.login, search: location.search })
-      }
+      onSwitch={onGoToSignIn}
       submitLabel="Sign up"
-      subtitle="Create an account with your email to start chatting."
+      subtitle="Create an account to start chatting."
       switchAction="Sign in"
       switchLabel="Already have an account?"
       title="Sign up"

@@ -5,9 +5,9 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
+  Query,
 } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { AuthUser } from '../../common/types/auth-user';
 import { CallsService } from './calls.service';
 import { CallException } from './types/call.exception';
 import { CallErrorCode } from './types/call.types';
@@ -22,17 +22,17 @@ export class CallsController {
   }
 
   @Get()
-  list(@CurrentUser() user: AuthUser) {
-    return this.callsService.listHistory(user.userId);
+  async list(@Query('userId', ParseIntPipe) userId: number) {
+    return this.callsService.listHistory(userId);
   }
 
   @Get(':callId')
   async findOne(
-    @CurrentUser() user: AuthUser,
+    @Query('userId', ParseIntPipe) userId: number,
     @Param('callId') callId: string,
   ) {
     try {
-      return await this.callsService.getCallForUser(user.userId, callId);
+      return await this.callsService.getCallForUser(userId, callId);
     } catch (error) {
       this.throwHttp(error);
     }

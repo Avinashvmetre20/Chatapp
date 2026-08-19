@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react';
 
 type AuthFormProps = {
-  mode: 'signin' | 'signup';
   title: string;
   subtitle: string;
   submitLabel: string;
   loadingLabel: string;
   switchLabel: string;
   switchAction: string;
+  includeEmail?: boolean;
   onSwitch: () => void;
-  onForgot?: () => void;
   onSubmit: (values: {
     firstName: string;
     lastName: string;
@@ -22,35 +21,28 @@ const fieldClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 outline-none placeholder:text-gray-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100';
 
 export function AuthForm({
-  mode,
   title,
   subtitle,
   submitLabel,
   loadingLabel,
   switchLabel,
   switchAction,
+  includeEmail = false,
   onSwitch,
-  onForgot,
   onSubmit,
 }: AuthFormProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setLoading(true);
     setError('');
 
-    if (mode === 'signup' && password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
     try {
       await onSubmit({ firstName, lastName, email, password });
     } catch (err: unknown) {
@@ -78,79 +70,59 @@ export function AuthForm({
           </p>
         ) : null}
 
-        {mode === 'signup' ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-gray-700">First name</span>
-              <input
-                autoComplete="given-name"
-                className={fieldClass}
-                maxLength={50}
-                onChange={(event) => setFirstName(event.target.value)}
-                required
-                value={firstName}
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-gray-700">Last name</span>
-              <input
-                autoComplete="family-name"
-                className={fieldClass}
-                maxLength={50}
-                onChange={(event) => setLastName(event.target.value)}
-                required
-                value={lastName}
-              />
-            </label>
-          </div>
-        ) : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-gray-700">First name</span>
+            <input
+              autoComplete="given-name"
+              className={fieldClass}
+              maxLength={50}
+              onChange={(event) => setFirstName(event.target.value)}
+              required
+              value={firstName}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-gray-700">Last name</span>
+            <input
+              autoComplete="family-name"
+              className={fieldClass}
+              maxLength={50}
+              onChange={(event) => setLastName(event.target.value)}
+              required
+              value={lastName}
+            />
+          </label>
+        </div>
 
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-gray-700">Email</span>
-          <input
-            autoComplete="email"
-            className={fieldClass}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
-        </label>
+        {includeEmail ? (
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-gray-700">Email</span>
+            <input
+              autoComplete="email"
+              className={fieldClass}
+              maxLength={255}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              type="email"
+              value={email}
+            />
+          </label>
+        ) : null}
 
         <label className="block space-y-1.5">
           <span className="text-sm font-medium text-gray-700">Password</span>
           <input
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            autoComplete="current-password"
             className={fieldClass}
-            maxLength={72}
-            minLength={mode === 'signup' ? 8 : 1}
+            maxLength={20}
+            minLength={6}
             onChange={(event) => setPassword(event.target.value)}
             required
             type="password"
             value={password}
           />
-          {mode === 'signup' ? (
-            <span className="text-xs text-gray-500">
-              At least 8 characters, with uppercase, lowercase, and a number.
-            </span>
-          ) : null}
         </label>
-
-        {mode === 'signup' ? (
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-gray-700">Confirm password</span>
-            <input
-              autoComplete="new-password"
-              className={fieldClass}
-              maxLength={72}
-              minLength={8}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              type="password"
-              value={confirmPassword}
-            />
-          </label>
-        ) : null}
 
         <button
           className="w-full rounded-xl bg-sky-600 px-4 py-3 text-base font-medium text-white hover:bg-sky-500 disabled:opacity-50"
@@ -159,18 +131,6 @@ export function AuthForm({
         >
           {loading ? loadingLabel : submitLabel}
         </button>
-
-        {mode === 'signin' && onForgot ? (
-          <p className="text-center text-sm">
-            <button
-              className="font-medium text-sky-600 hover:text-sky-500"
-              onClick={onForgot}
-              type="button"
-            >
-              Forgot password?
-            </button>
-          </p>
-        ) : null}
 
         <p className="text-center text-sm text-gray-500">
           {switchLabel}{' '}

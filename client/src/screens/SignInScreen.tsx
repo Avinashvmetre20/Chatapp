@@ -1,35 +1,26 @@
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
-import { usePageTitle } from '../hooks/usePageTitle';
-import { paths, safeAppPath } from '../routes';
 import { AuthForm } from './AuthForm';
+import { signIn, type User } from '../api';
 
-export function SignInScreen() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [params] = useSearchParams();
-  const fromState = (location.state as { from?: string } | null)?.from;
-  const next = safeAppPath(params.get('next') ?? fromState);
+type SignInScreenProps = {
+  onSuccess: (user: User) => void;
+  onGoToSignUp: () => void;
+};
 
-  usePageTitle('Sign in | Chat App');
-
+export function SignInScreen({ onSuccess, onGoToSignUp }: SignInScreenProps) {
   return (
     <AuthForm
       loadingLabel="Signing in..."
-      mode="signin"
-      onForgot={() =>
-        navigate({ pathname: paths.forgotPassword, search: location.search })
-      }
       onSubmit={async (values) => {
-        await login(values.email, values.password);
-        navigate(next, { replace: true });
+        const user = await signIn({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          password: values.password,
+        });
+        onSuccess(user);
       }}
-      onSwitch={() =>
-        navigate({ pathname: paths.signup, search: location.search })
-      }
+      onSwitch={onGoToSignUp}
       submitLabel="Sign in"
-      subtitle="Use the email and password for your account."
+      subtitle="Use the first name, last name, and password you registered with."
       switchAction="Sign up"
       switchLabel="New here?"
       title="Sign in"
