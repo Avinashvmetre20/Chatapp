@@ -10,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { PresenceService } from '../presence/presence.service';
+import { WsAuthService } from '../auth/ws-auth.service';
 import { ChatsService } from './chats.service';
 
 export type ChatPayload = {
@@ -48,11 +49,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => ChatsService))
     private readonly chatsService: ChatsService,
     private readonly presenceService: PresenceService,
+    private readonly wsAuthService: WsAuthService,
   ) {}
 
   handleConnection(client: Socket) {
-    const userId = Number(client.handshake.query.userId);
-    if (!Number.isFinite(userId) || userId < 1) {
+    let userId: number;
+    try {
+      userId = this.wsAuthService.authenticate(client);
+    } catch {
       client.disconnect();
       return;
     }

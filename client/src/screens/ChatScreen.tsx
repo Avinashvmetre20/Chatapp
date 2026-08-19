@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { io, type Socket } from 'socket.io-client';
 import {
   API_URL,
+  ApiError,
+  getAccessToken,
   getUsers,
   type Chat,
   type MessageStatus,
@@ -251,7 +253,7 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
   useEffect(() => {
     let cancelled = false;
 
-    void getUsers(currentUser.user_id)
+    void getUsers()
       .then((list) => {
         if (cancelled) {
           return;
@@ -269,9 +271,14 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
         setUsers(list);
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load users');
+        if (cancelled) {
+          return;
         }
+        if (err instanceof ApiError && err.status === 401) {
+          onSignOut();
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load users');
       });
 
     return () => {
@@ -299,7 +306,7 @@ export function ChatScreen({ currentUser, onSignOut }: ChatScreenProps) {
 
   useEffect(() => {
     const socket = io(API_URL, {
-      query: { userId: String(currentUser.user_id) },
+      auth: { token: getAccessToken() },
       transports: ['websocket', 'polling'],
     });
 

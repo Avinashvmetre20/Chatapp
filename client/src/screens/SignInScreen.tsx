@@ -1,5 +1,5 @@
 import { AuthForm } from './AuthForm';
-import { signIn, type User } from '../api';
+import { persistSession, signIn, type User } from '../api';
 
 type SignInScreenProps = {
   onSuccess: (user: User) => void;
@@ -9,18 +9,21 @@ type SignInScreenProps = {
 export function SignInScreen({ onSuccess, onGoToSignUp }: SignInScreenProps) {
   return (
     <AuthForm
+      includeEmail
+      includeName={false}
       loadingLabel="Signing in..."
       onSubmit={async (values) => {
-        const user = await signIn({
-          firstName: values.firstName,
-          lastName: values.lastName,
+        const session = await signIn({
+          email: values.email,
           password: values.password,
         });
-        onSuccess(user);
+        persistSession(session);
+        onSuccess(session.user);
       }}
       onSwitch={onGoToSignUp}
+      passwordAutoComplete="current-password"
       submitLabel="Sign in"
-      subtitle="Use the first name, last name, and password you registered with."
+      subtitle="Use the email and password you registered with."
       switchAction="Sign up"
       switchLabel="New here?"
       title="Sign in"

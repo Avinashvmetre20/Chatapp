@@ -7,7 +7,9 @@ type AuthFormProps = {
   loadingLabel: string;
   switchLabel: string;
   switchAction: string;
+  includeName?: boolean;
   includeEmail?: boolean;
+  passwordAutoComplete?: 'current-password' | 'new-password';
   onSwitch: () => void;
   onSubmit: (values: {
     firstName: string;
@@ -27,7 +29,9 @@ export function AuthForm({
   loadingLabel,
   switchLabel,
   switchAction,
+  includeName = true,
   includeEmail = false,
+  passwordAutoComplete = 'current-password',
   onSwitch,
   onSubmit,
 }: AuthFormProps) {
@@ -70,30 +74,32 @@ export function AuthForm({
           </p>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-gray-700">First name</span>
-            <input
-              autoComplete="given-name"
-              className={fieldClass}
-              maxLength={50}
-              onChange={(event) => setFirstName(event.target.value)}
-              required
-              value={firstName}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-gray-700">Last name</span>
-            <input
-              autoComplete="family-name"
-              className={fieldClass}
-              maxLength={50}
-              onChange={(event) => setLastName(event.target.value)}
-              required
-              value={lastName}
-            />
-          </label>
-        </div>
+        {includeName ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-gray-700">First name</span>
+              <input
+                autoComplete="given-name"
+                className={fieldClass}
+                maxLength={50}
+                onChange={(event) => setFirstName(event.target.value)}
+                required
+                value={firstName}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-gray-700">Last name</span>
+              <input
+                autoComplete="family-name"
+                className={fieldClass}
+                maxLength={50}
+                onChange={(event) => setLastName(event.target.value)}
+                required
+                value={lastName}
+              />
+            </label>
+          </div>
+        ) : null}
 
         {includeEmail ? (
           <label className="block space-y-1.5">
@@ -113,7 +119,7 @@ export function AuthForm({
         <label className="block space-y-1.5">
           <span className="text-sm font-medium text-gray-700">Password</span>
           <input
-            autoComplete="current-password"
+            autoComplete={passwordAutoComplete}
             className={fieldClass}
             maxLength={20}
             minLength={6}
