@@ -53,6 +53,14 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
     console.debug('[call]', event, payload ?? {});
   }, []);
 
+  const isTimeoutLikeError = useCallback((err: unknown) => {
+    if (!(err instanceof Error)) {
+      return false;
+    }
+    const message = err.message.toLowerCase();
+    return message.includes('timed out') || message.includes('network is slow');
+  }, []);
+
   const resetMedia = useCallback(() => {
     webrtcRef.current.stop();
     setLocalStream(null);
@@ -314,7 +322,12 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
             sdp: offer,
           });
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Could not send call offer');
+          debugLog('offer:error', {
+            message: err instanceof Error ? err.message : 'unknown',
+          });
+          if (!isTimeoutLikeError(err)) {
+            setError(err instanceof Error ? err.message : 'Could not send call offer');
+          }
         }
       })();
     };
@@ -341,7 +354,12 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
             sdp: answer,
           });
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Could not answer the call');
+          debugLog('answer:error', {
+            message: err instanceof Error ? err.message : 'unknown',
+          });
+          if (!isTimeoutLikeError(err)) {
+            setError(err instanceof Error ? err.message : 'Could not answer the call');
+          }
         }
       })();
     };
@@ -423,7 +441,15 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       socket.off('call:timeout', onTimeout);
       socket.off('call:busy', onBusy);
     };
-  }, [currentUser.user_id, debugLog, onIncomingCall, preparePeer, resetCall, socket]);
+  }, [
+    currentUser.user_id,
+    debugLog,
+    isTimeoutLikeError,
+    onIncomingCall,
+    preparePeer,
+    resetCall,
+    socket,
+  ]);
 
   useEffect(() => {
     debugLog('state:phase', {
@@ -435,8 +461,9 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
   }, [call?.callId, call?.status, debugLog, otherUserId, phase]);
 
   useEffect(() => {
+    const webrtc = webrtcRef.current;
     return () => {
-      webrtcRef.current.stop();
+      webrtc.stop();
     };
   }, []);
 

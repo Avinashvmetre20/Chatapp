@@ -18,8 +18,16 @@ function emitAck<T>(
   payload: object,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    socket.timeout(12000).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
+    socket.timeout(20000).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
       if (err) {
+        if (err.message?.toLowerCase().includes('timed out')) {
+          reject(
+            new Error(
+              'Network is slow. Please try again.',
+            ),
+          );
+          return;
+        }
         reject(err);
         return;
       }
@@ -30,6 +38,11 @@ function emitAck<T>(
       resolve(result);
     });
   });
+}
+
+function emitNoAck(socket: Socket, event: string, payload: object): Promise<{ ok: true }> {
+  socket.emit(event, payload);
+  return Promise.resolve({ ok: true });
 }
 
 export const callSocket = {
@@ -56,14 +69,14 @@ export const callSocket = {
     socket: Socket,
     payload: { callId: string; receiverId: number; sdp: RTCSessionDescriptionInit },
   ) {
-    return emitAck<{ ok: true }>(socket, 'call:offer', payload);
+    return emitNoAck(socket, 'call:offer', payload);
   },
 
   answer(
     socket: Socket,
     payload: { callId: string; receiverId: number; sdp: RTCSessionDescriptionInit },
   ) {
-    return emitAck<{ ok: true }>(socket, 'call:answer', payload);
+    return emitNoAck(socket, 'call:answer', payload);
   },
 
   iceCandidate(
@@ -74,6 +87,6 @@ export const callSocket = {
       candidate: RTCIceCandidateInit;
     },
   ) {
-    return emitAck<{ ok: true }>(socket, 'call:ice-candidate', payload);
+    return emitNoAck(socket, 'call:ice-candidate', payload);
   },
 };
