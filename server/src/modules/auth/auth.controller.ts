@@ -16,6 +16,7 @@ import { CookieService, REFRESH_COOKIE } from './cookie.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -46,6 +47,7 @@ export class AuthController {
     return {
       user: result.user,
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     };
   }
 
@@ -69,6 +71,7 @@ export class AuthController {
     return {
       user: result.user,
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     };
   }
 
@@ -76,11 +79,13 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('refresh')
   async refresh(
+    @Body() dto: RefreshDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.refresh(
       request.cookies?.[REFRESH_COOKIE] as string | undefined,
+      dto.refreshToken,
       this.authService.requestMeta(request),
     );
     this.cookieService.setRefreshToken(
@@ -91,6 +96,7 @@ export class AuthController {
     return {
       user: result.user,
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     };
   }
 

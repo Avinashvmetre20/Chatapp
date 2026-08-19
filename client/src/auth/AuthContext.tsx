@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  clearStoredAuth,
   getAccessToken,
   login as loginRequest,
   logout as logoutRequest,
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearSession = useCallback(() => {
-    setAccessToken(null);
+    clearStoredAuth();
     setUser(null);
     setToken(null);
     setStatus('unauthenticated');

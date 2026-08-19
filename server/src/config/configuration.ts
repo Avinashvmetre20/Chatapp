@@ -27,7 +27,7 @@ export default () => ({
   auth: {
     jwtSecret: process.env.JWT_SECRET ?? '',
     accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN ?? '15m',
-    refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN ?? '30d',
+    refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN ?? '7d',
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
     loginMaxAttempts: Number(process.env.AUTH_LOGIN_MAX_ATTEMPTS) || 5,
     loginLockMinutes: Number(process.env.AUTH_LOGIN_LOCK_MINUTES) || 15,

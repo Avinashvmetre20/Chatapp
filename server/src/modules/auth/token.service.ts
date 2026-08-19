@@ -20,7 +20,7 @@ export class TokenService {
     this.accessExpiresIn =
       this.configService.get<string>('auth.accessTokenExpiresIn') ?? '15m';
     this.refreshExpiresIn =
-      this.configService.get<string>('auth.refreshTokenExpiresIn') ?? '30d';
+      this.configService.get<string>('auth.refreshTokenExpiresIn') ?? '7d';
 
     if (!this.jwtSecret || this.jwtSecret.length < 32) {
       throw new InternalServerErrorException('JWT_SECRET is not configured');

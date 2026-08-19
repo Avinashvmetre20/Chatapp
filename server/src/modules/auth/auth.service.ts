@@ -151,15 +151,20 @@ export class AuthService {
     return this.createSession(account.user_id, meta);
   }
 
-  async refresh(rawRefreshToken: string | undefined, meta: RequestMeta) {
-    if (!rawRefreshToken) {
+  async refresh(
+    rawRefreshToken: string | undefined,
+    bodyRefreshToken: string | undefined,
+    meta: RequestMeta,
+  ) {
+    const token = rawRefreshToken?.trim() || bodyRefreshToken?.trim();
+    if (!token) {
       throw new AuthException(
         AuthErrorCode.SESSION_EXPIRED,
         'Session expired. Please sign in again.',
       );
     }
 
-    const tokenHash = this.tokenService.hashToken(rawRefreshToken);
+    const tokenHash = this.tokenService.hashToken(token);
     const found = await this.authRepository.findSessionByRefreshHash(tokenHash);
     const session = found.rows[0];
 

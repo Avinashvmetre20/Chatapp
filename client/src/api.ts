@@ -1,6 +1,7 @@
-export const API_URL = import.meta.env.DEV
-  ? ''
-  : 'https://chatapp-j9na.onrender.com';
+// Same-origin in dev (Vite proxy) and production (Vercel rewrites).
+export const API_URL = '';
+
+const REFRESH_TOKEN_KEY = 'chat_refresh_token';
 
 export type User = {
   user_id: number;
@@ -28,6 +29,7 @@ export type Chat = {
 export type AuthPayload = {
   user: User;
   accessToken: string;
+  refreshToken?: string;
 };
 
 type ErrorBody = {
@@ -44,8 +46,38 @@ export function setAccessToken(token: string | null) {
   accessTokenMemory = token;
 }
 
+export function clearStoredAuth() {
+  persistAuthPayload(null);
+}
+
 export function getAccessToken() {
   return accessTokenMemory;
+}
+
+function setStoredRefreshToken(token: string | null) {
+  if (token) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+    return;
+  }
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+function getStoredRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function persistAuthPayload(data: AuthPayload | null) {
+  if (!data?.accessToken) {
+    setAccessToken(null);
+    setStoredRefreshToken(null);
+    return null;
+  }
+
+  setAccessToken(data.accessToken);
+  if (data.refreshToken) {
+    setStoredRefreshToken(data.refreshToken);
+  }
+  return data;
 }
 
 function unwrap<T>(body: unknown): T {
@@ -81,23 +113,22 @@ async function refreshAccessToken() {
   }
 
   refreshInFlight = (async () => {
+    const storedRefreshToken = getStoredRefreshToken();
     const response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        storedRefreshToken ? { refreshToken: storedRefreshToken } : {},
+      ),
     });
     const body = await parseBody(response);
     if (!response.ok) {
-      setAccessToken(null);
+      persistAuthPayload(null);
       return null;
     }
     const data = unwrap<AuthPayload>(body);
-    if (!data?.accessToken) {
-      setAccessToken(null);
-      return null;
-    }
-    setAccessToken(data.accessToken);
-    return data;
+    return persistAuthPayload(data);
   })().finally(() => {
     refreshInFlight = null;
   });
@@ -152,30 +183,34 @@ export function register(body: {
   return request<AuthPayload>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(body),
-  });
+  }).then((data) => persistAuthPayload(data)!);
 }
 
 export function login(body: { email: string; password: string }) {
   return request<AuthPayload>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(body),
-  });
+  }).then((data) => persistAuthPayload(data)!);
 }
 
 export async function refreshSession() {
-  const refreshed = await refreshAccessToken();
-  if (!refreshed?.accessToken || !refreshed.user) {
-    return null;
-  }
-  return refreshed;
+  return refreshAccessToken();
 }
 
 export function logout() {
-  return request<{ ok: true }>('/auth/logout', { method: 'POST' });
+  return request<{ ok: true }>('/auth/logout', { method: 'POST' }).finally(
+    () => {
+      persistAuthPayload(null);
+    },
+  );
 }
 
 export function logoutAll() {
-  return request<{ ok: true }>('/auth/logout-all', { method: 'POST' });
+  return request<{ ok: true }>('/auth/logout-all', { method: 'POST' }).finally(
+    () => {
+      persistAuthPayload(null);
+    },
+  );
 }
 
 export function forgotPassword(email: string) {
