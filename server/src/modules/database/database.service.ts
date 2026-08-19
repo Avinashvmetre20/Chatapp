@@ -141,6 +141,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         session_id UUID PRIMARY KEY,
         user_id BIGINT NOT NULL REFERENCES user_master(user_id),
         refresh_token_hash TEXT NOT NULL,
+        previous_refresh_token_hash TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         last_used_at TIMESTAMPTZ,
         expires_at TIMESTAMPTZ NOT NULL,
@@ -148,6 +149,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ip_address INET,
         user_agent TEXT
       )
+    `);
+    await this.pool.query(`
+      ALTER TABLE user_sessions
+      ADD COLUMN IF NOT EXISTS previous_refresh_token_hash TEXT
     `);
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id

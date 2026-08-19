@@ -1,5 +1,5 @@
 export const API_URL = import.meta.env.DEV
-  ? 'http://localhost:3000'
+  ? ''
   : 'https://chatapp-j9na.onrender.com';
 
 export type User = {
@@ -38,7 +38,7 @@ type ErrorBody = {
 };
 
 let accessTokenMemory: string | null = null;
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<AuthPayload | null> | null = null;
 
 export function setAccessToken(token: string | null) {
   accessTokenMemory = token;
@@ -92,8 +92,12 @@ async function refreshAccessToken() {
       return null;
     }
     const data = unwrap<AuthPayload>(body);
+    if (!data?.accessToken) {
+      setAccessToken(null);
+      return null;
+    }
     setAccessToken(data.accessToken);
-    return data.accessToken;
+    return data;
   })().finally(() => {
     refreshInFlight = null;
   });
@@ -125,8 +129,8 @@ export async function request<T>(
     retry &&
     !path.startsWith('/auth/')
   ) {
-    const nextToken = await refreshAccessToken();
-    if (nextToken) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed?.accessToken) {
       return request<T>(path, init, false);
     }
   }
@@ -159,12 +163,11 @@ export function login(body: { email: string; password: string }) {
 }
 
 export async function refreshSession() {
-  const token = await refreshAccessToken();
-  if (!token) {
+  const refreshed = await refreshAccessToken();
+  if (!refreshed?.accessToken || !refreshed.user) {
     return null;
   }
-  const me = await request<{ user: User }>('/auth/me');
-  return { user: me.user, accessToken: token };
+  return refreshed;
 }
 
 export function logout() {

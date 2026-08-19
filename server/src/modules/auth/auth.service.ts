@@ -174,7 +174,12 @@ export class AuthService {
       );
     }
 
-    return this.rotateSession(session.session_id, session.user_id, meta);
+    return this.rotateSession(
+      session.session_id,
+      Number(session.user_id),
+      session.refresh_token_hash,
+      meta,
+    );
   }
 
   async logout(sessionId: string, userId: number, meta: RequestMeta) {
@@ -412,13 +417,15 @@ export class AuthService {
   private async rotateSession(
     sessionId: string,
     userId: number,
-    meta: RequestMeta,
+    currentRefreshHash: string,
+    _meta: RequestMeta,
   ) {
     const refreshToken = this.tokenService.createRefreshToken();
     const refreshTokenHash = this.tokenService.hashToken(refreshToken);
     const expiresAt = this.tokenService.refreshExpiresAt();
     await this.authRepository.rotateSession(
       sessionId,
+      currentRefreshHash,
       refreshTokenHash,
       expiresAt,
     );

@@ -1,18 +1,21 @@
 import { useState, type FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { forgotPassword } from '../api';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { paths } from '../routes';
 
 const fieldClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 outline-none placeholder:text-gray-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100';
 
-type ForgotPasswordScreenProps = {
-  onGoToSignIn: () => void;
-};
-
-export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps) {
+export function ForgotPasswordScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  usePageTitle('Forgot password | Chat App');
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -80,7 +83,9 @@ export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps
         <p className="text-center text-sm text-gray-500">
           <button
             className="font-medium text-sky-600 hover:text-sky-500"
-            onClick={onGoToSignIn}
+            onClick={() =>
+              navigate({ pathname: paths.login, search: location.search })
+            }
             type="button"
           >
             Back to sign in

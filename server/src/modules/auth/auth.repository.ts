@@ -21,6 +21,7 @@ export type SessionRow = {
   session_id: string;
   user_id: number;
   refresh_token_hash: string;
+  previous_refresh_token_hash: string | null;
   expires_at: Date;
   revoked_at: Date | null;
 };
@@ -145,7 +146,8 @@ export class AuthRepository {
 
   findSession(sessionId: string) {
     return this.databaseService.query<SessionRow>(
-      `SELECT session_id, user_id, refresh_token_hash, expires_at, revoked_at
+      `SELECT session_id, user_id, refresh_token_hash, previous_refresh_token_hash,
+              expires_at, revoked_at
        FROM user_sessions
        WHERE session_id = $1`,
       [sessionId],
@@ -154,26 +156,30 @@ export class AuthRepository {
 
   findSessionByRefreshHash(tokenHash: string) {
     return this.databaseService.query<SessionRow>(
-      `SELECT session_id, user_id, refresh_token_hash, expires_at, revoked_at
+      `SELECT session_id, user_id, refresh_token_hash, previous_refresh_token_hash,
+              expires_at, revoked_at
        FROM user_sessions
-       WHERE refresh_token_hash = $1`,
+       WHERE refresh_token_hash = $1
+          OR previous_refresh_token_hash = $1`,
       [tokenHash],
     );
   }
 
   rotateSession(
     sessionId: string,
-    refreshTokenHash: string,
+    currentHash: string,
+    nextHash: string,
     expiresAt: Date,
   ) {
     return this.databaseService.query(
       `UPDATE user_sessions
-       SET refresh_token_hash = $2,
+       SET previous_refresh_token_hash = $2,
+           refresh_token_hash = $3,
            last_used_at = NOW(),
-           expires_at = $3
+           expires_at = $4
        WHERE session_id = $1
          AND revoked_at IS NULL`,
-      [sessionId, refreshTokenHash, expiresAt],
+      [sessionId, currentHash, nextHash, expiresAt],
     );
   }
 

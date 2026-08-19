@@ -34,10 +34,9 @@ export default () => ({
     cookie: {
       secure: process.env.AUTH_COOKIE_SECURE
         ? process.env.AUTH_COOKIE_SECURE === 'true'
-        : process.env.NODE_ENV === 'production',
+        : true,
       httpOnly: process.env.AUTH_COOKIE_HTTP_ONLY !== 'false',
-      sameSite: (process.env.AUTH_COOKIE_SAME_SITE ??
-        (process.env.NODE_ENV === 'production' ? 'none' : 'lax')) as
+      sameSite: (process.env.AUTH_COOKIE_SAME_SITE ?? 'none') as
         | 'lax'
         | 'strict'
         | 'none',

@@ -1,12 +1,17 @@
-import { AuthForm } from './AuthForm';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
+import { paths, safeAppPath } from '../routes';
+import { AuthForm } from './AuthForm';
 
-type SignUpScreenProps = {
-  onGoToSignIn: () => void;
-};
-
-export function SignUpScreen({ onGoToSignIn }: SignUpScreenProps) {
+export function SignUpScreen() {
   const { register } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const next = safeAppPath(params.get('next'));
+
+  usePageTitle('Sign up | Chat App');
 
   return (
     <AuthForm
@@ -14,8 +19,11 @@ export function SignUpScreen({ onGoToSignIn }: SignUpScreenProps) {
       mode="signup"
       onSubmit={async (values) => {
         await register(values);
+        navigate(next, { replace: true });
       }}
-      onSwitch={onGoToSignIn}
+      onSwitch={() =>
+        navigate({ pathname: paths.login, search: location.search })
+      }
       submitLabel="Sign up"
       subtitle="Create an account with your email to start chatting."
       switchAction="Sign in"

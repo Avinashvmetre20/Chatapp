@@ -5,8 +5,6 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import configuration from './config/configuration';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { SuccessInterceptor } from './common/interceptors/success.interceptor';
@@ -35,9 +33,7 @@ import { PresenceModule } from './modules/presence/presence.module';
     ChatsModule,
     CallsModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

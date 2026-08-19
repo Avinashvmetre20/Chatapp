@@ -23,14 +23,15 @@ export class CookieService {
     const sameSite =
       this.configService.get<'lax' | 'strict' | 'none'>('auth.cookie.sameSite') ??
       'lax';
+    const secure = Boolean(this.configService.get<boolean>('auth.cookie.secure'));
 
     return {
       httpOnly:
         this.configService.get<boolean>('auth.cookie.httpOnly') !== false,
-      secure: Boolean(this.configService.get<boolean>('auth.cookie.secure')),
+      secure: sameSite === 'none' ? true : secure,
       sameSite,
       expires: expiresAt,
-      path: '/auth',
+      path: '/',
     };
   }
 }
