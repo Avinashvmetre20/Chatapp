@@ -16,14 +16,15 @@ function emitAck<T>(
   socket: Socket,
   event: string,
   payload: object,
+  timeoutMs = 20000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    socket.timeout(20000).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
+    socket.timeout(timeoutMs).emit(event, payload, (err: Error | null, result: CallAck<T>) => {
       if (err) {
         if (err.message?.toLowerCase().includes('timed out')) {
           reject(
             new Error(
-              'Network is slow. Please try again.',
+              `Could not reach the server (${event}). Check your connection and try again.`,
             ),
           );
           return;
@@ -50,7 +51,7 @@ export const callSocket = {
     socket: Socket,
     payload: { receiverId: number; callType: CallType },
   ) {
-    return emitAck<CallSession>(socket, 'call:initiate', payload);
+    return emitAck<CallSession>(socket, 'call:initiate', payload, 30000);
   },
 
   accept(socket: Socket, callId: string) {

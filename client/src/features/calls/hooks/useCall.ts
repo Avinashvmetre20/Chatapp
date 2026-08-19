@@ -58,7 +58,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       return false;
     }
     const message = err.message.toLowerCase();
-    return message.includes('timed out') || message.includes('network is slow');
+    return message.includes('timed out') || message.includes('could not reach the server');
   }, []);
 
   const resetMedia = useCallback(() => {
@@ -133,9 +133,6 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
       setCameraOn(callType === 'video');
 
       try {
-        iceServersRef.current = await getIceServers();
-        const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
-        setLocalStream(stream);
         const nextCall = await callSocket.initiate(socket, {
           receiverId,
           callType,
@@ -147,12 +144,49 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         });
         callRef.current = nextCall;
         setCall(nextCall);
+
+        iceServersRef.current = await getIceServers();
+        const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
+        setLocalStream(stream);
       } catch (err) {
         debugLog('startCall:error', {
           receiverId,
           callType,
           message: err instanceof Error ? err.message : 'unknown',
         });
+
+        if (callRef.current && isTimeoutLikeError(err)) {
+          try {
+            iceServersRef.current = await getIceServers();
+            const stream = await webrtcRef.current.startLocalMedia(callType === 'video');
+            setLocalStream(stream);
+            return;
+          } catch (mediaErr) {
+            try {
+              await callSocket.end(socket, callRef.current.callId);
+            } catch {
+              // Hang up locally even if signaling ack fails.
+            }
+            resetCall();
+            const media = mapMediaError(mediaErr);
+            setError(
+              mediaErr instanceof DOMException || media.code !== 'unknown'
+                ? media.message
+                : mediaErr instanceof Error
+                  ? mediaErr.message
+                  : 'Could not start the call',
+            );
+            return;
+          }
+        }
+
+        if (callRef.current) {
+          try {
+            await callSocket.end(socket, callRef.current.callId);
+          } catch {
+            // Hang up locally even if signaling ack fails.
+          }
+        }
         resetCall();
         const media = mapMediaError(err);
         setError(
@@ -164,7 +198,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         );
       }
     },
-    [debugLog, phase, resetCall, socket],
+    [debugLog, isTimeoutLikeError, phase, resetCall, socket],
   );
 
   const acceptCall = useCallback(async () => {
@@ -283,6 +317,7 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         callRef.current = incoming;
         setCall(incoming);
         setPhase('incoming');
+        setError('');
         onIncomingCall?.(incoming);
         return;
       }
@@ -405,7 +440,9 @@ export function useCall({ socket, currentUser, onIncomingCall }: UseCallOptions)
         return;
       }
       resetCall();
-      setError('The call was not answered.');
+      if (timedOut.callerId === currentUser.user_id) {
+        setError('The call was not answered.');
+      }
     };
 
     const onBusy = ({ call: busy }: CallEnvelope) => {

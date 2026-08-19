@@ -20,5 +20,6 @@ import { InMemoryActiveCallStore } from './in-memory-active-call.store';
       useClass: InMemoryActiveCallStore,
     },
   ],
+  exports: [CallsService],
 })
 export class CallsModule {}

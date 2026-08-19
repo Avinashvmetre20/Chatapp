@@ -11,6 +11,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { WsAuthService } from '../auth/ws-auth.service';
+import { CallsService } from '../calls/calls.service';
 import { PresenceService } from '../presence/presence.service';
 import { ChatsService } from './chats.service';
 
@@ -51,6 +52,8 @@ export class ChatGateway
   constructor(
     @Inject(forwardRef(() => ChatsService))
     private readonly chatsService: ChatsService,
+    @Inject(forwardRef(() => CallsService))
+    private readonly callsService: CallsService,
     private readonly presenceService: PresenceService,
     private readonly wsAuthService: WsAuthService,
   ) {}
@@ -81,6 +84,8 @@ export class ChatGateway
     }
 
     const { becameOnline } = this.presenceService.register(client, userId);
+
+    void this.callsService.resendRingingCalls(userId);
 
     client.emit('presence:list', this.presenceService.getOnlineUserIds());
     if (becameOnline) {

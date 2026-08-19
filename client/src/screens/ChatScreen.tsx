@@ -177,6 +177,8 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   const bottomRef = useRef<HTMLDivElement>(null);
   const otherUserIdRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const accessTokenRef = useRef(accessToken);
+  accessTokenRef.current = accessToken;
   const usersRef = useRef<User[]>([]);
   const openChatRef = useRef<(userId: number) => void>(() => {});
   const callRouteSyncRef = useRef<'off' | 'joining' | 'on'>('off');
@@ -450,8 +452,12 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   }, []);
 
   useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
     const socket = io(SOCKET_URL || undefined, {
-      auth: { token: accessToken },
+      auth: { token: accessTokenRef.current },
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });
@@ -576,12 +582,19 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
     };
   }, [
     currentUser.user_id,
-    accessToken,
     flushQueuedMessages,
     loadConversation,
     markConversationSeen,
     onSignOut,
   ]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !accessToken) {
+      return;
+    }
+    socket.auth = { token: accessToken };
+  }, [accessToken]);
 
   useEffect(() => {
     otherUserIdRef.current = otherUserId;
