@@ -221,6 +221,20 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   endCallRef.current = call.endCall;
 
   useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+    console.debug('[call-modal]', {
+      phase: call.phase,
+      callId: call.call?.callId ?? null,
+      status: call.call?.status ?? null,
+      callerId: call.call?.callerId ?? null,
+      receiverId: call.call?.receiverId ?? null,
+      visible: call.phase === 'incoming' && Boolean(call.call),
+    });
+  }, [call.call, call.phase]);
+
+  useEffect(() => {
     if (
       (route.kind === 'chat' ||
         route.kind === 'videocall' ||

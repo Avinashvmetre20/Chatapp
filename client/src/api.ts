@@ -8,7 +8,7 @@ export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
     ? ''
     : 'https://chatapp-j9na.onrender.com';
 
-const REFRESH_TOKEN_KEY = 'chat_refresh_token';
+const REFRESH_TOKEN_KEY = 'chatapp_token';
 
 export type User = {
   user_id: number;
@@ -62,6 +62,7 @@ export function getAccessToken() {
 }
 
 function setStoredRefreshToken(token: string | null) {
+  localStorage.removeItem('chat_refresh_token');
   if (token) {
     localStorage.setItem(REFRESH_TOKEN_KEY, token);
     return;
