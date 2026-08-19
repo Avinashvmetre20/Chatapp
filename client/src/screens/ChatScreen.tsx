@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import {
-  API_URL,
+  SOCKET_URL,
   getUsers,
   type Chat,
   type MessageStatus,
@@ -436,7 +436,7 @@ export function ChatScreen({ currentUser, accessToken, onSignOut }: ChatScreenPr
   }, []);
 
   useEffect(() => {
-    const socket = io(API_URL || undefined, {
+    const socket = io(SOCKET_URL || undefined, {
       auth: { token: accessToken },
       transports: ['websocket', 'polling'],
       withCredentials: true,

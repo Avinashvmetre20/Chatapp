@@ -33,10 +33,6 @@
       "destination": "https://chatapp-j9na.onrender.com/health"
     },
     {
-      "source": "/socket.io/:path*",
-      "destination": "https://chatapp-j9na.onrender.com/socket.io/:path*"
-    },
-    {
       "source": "/((?!assets/|favicon.svg|icons.svg).*)",
       "destination": "/index.html"
     }

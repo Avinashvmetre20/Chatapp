@@ -1,5 +1,12 @@
-// Same-origin in dev (Vite proxy) and production (Vercel rewrites).
+// REST: same-origin in dev (Vite proxy) and production (Vercel rewrites).
 export const API_URL = '';
+
+// WebSockets: Vercel cannot proxy Socket.IO upgrades — connect to Render in prod.
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
+  ? import.meta.env.VITE_SOCKET_URL
+  : import.meta.env.DEV
+    ? ''
+    : 'https://chatapp-j9na.onrender.com';
 
 const REFRESH_TOKEN_KEY = 'chat_refresh_token';
 
